@@ -1,0 +1,55 @@
+name: PhotoCraft Android ARM64 compatibility
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'crates/**'
+      - 'apps/**'
+      - 'android/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/android-arm64.yml'
+jobs:
+  android-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - uses: Swatinem/rust-cache@v2
+      - name: Configure Android NDK linker
+        run: |
+          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang" >> "$GITHUB_ENV"
+          echo "CC_aarch64_linux_android=$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang" >> "$GITHUB_ENV"
+      - name: Check PhotoCraft UI for Android ARM64
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo build --release -p photocraft-android --target aarch64-linux-android 2>&1 | tee android-check.log
+      - name: Upload diagnostic log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-arm64-check-log
+          path: android-check.log
+          if-no-files-found: ignore
+
+      - name: Stage native library
+        run: |
+          mkdir -p android/app/src/main/jniLibs/arm64-v8a
+          cp target/aarch64-linux-android/release/libphotocraft_android.so android/app/src/main/jniLibs/arm64-v8a/
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Assemble debug APK
+        run: gradle -p android :app:assembleDebug --no-daemon
+      - name: Upload Android APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhotoCraft-Android-arm64-APK
+          path: android/app/build/outputs/apk/debug/*.apk

@@ -1,0 +1,14 @@
+[package]
+name = "photocraft-android"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+android-activity = { version = "0.6", features = ["native-activity"] }
+eframe = { workspace = true, features = ["wgpu", "android-native-activity"] }
+photocraft-ui-egui = { workspace = true }
+photocraft-engine = { workspace = true }
