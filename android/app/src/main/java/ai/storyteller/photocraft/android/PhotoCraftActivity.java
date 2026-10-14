@@ -1,6 +1,9 @@
 package ai.storyteller.photocraft.android;
 
 import android.app.NativeActivity;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
@@ -26,6 +29,7 @@ public class PhotoCraftActivity extends NativeActivity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         immersive();
+        requestPhotoPermission();
         Button open = new Button(this);
         open.setText("Abrir foto");
         open.setTextSize(11);
@@ -42,6 +46,17 @@ public class PhotoCraftActivity extends NativeActivity {
         layout.topMargin = 3;
         layout.rightMargin = 8;
         addContentView(open, layout);
+    }
+    private void requestPhotoPermission() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.READ_MEDIA_IMAGES}, 2001);
+            }
+        } else if (Build.VERSION.SDK_INT >= 23) {
+            if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, 2001);
+            }
+        }
     }
     @Override public void onWindowFocusChanged(boolean focused) {
         super.onWindowFocusChanged(focused);
