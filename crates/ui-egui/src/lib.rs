@@ -1767,13 +1767,13 @@ impl eframe::App for PhotocraftApp {
             // If a second finger is present, discard synthetic pointer activity
             // before egui routes it to a brush or eraser.
             let key = egui::Id::new("android-active-touch-ids");
-            let mut fingers = ctx.data(|d| d.get_temp::<std::collections::HashSet<egui::TouchId>>(key)).unwrap_or_default();
+            let mut fingers = ctx.data(|d| d.get_temp::<std::collections::HashSet<u64>>(key)).unwrap_or_default();
             let mut multi = fingers.len() >= 2;
             for event in &raw_input.events {
                 if let egui::Event::Touch { id, phase, .. } = event {
                     match phase {
-                        egui::TouchPhase::Start => { fingers.insert(*id); }
-                        egui::TouchPhase::End | egui::TouchPhase::Cancel => { fingers.remove(id); }
+                        egui::TouchPhase::Start => { fingers.insert(id.0); }
+                        egui::TouchPhase::End | egui::TouchPhase::Cancel => { fingers.remove(&id.0); }
                         _ => {}
                     }
                     multi |= fingers.len() >= 2;
