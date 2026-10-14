@@ -2868,6 +2868,33 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
     let xf = ViewXform { rect, zoom: point_zoom, center: view.center, flip, rotation: view.rotation, aspect };
     let pixel_grid = app.ui.view.shows(app.ui.view.show.pixel_grid);
     let response = ui.allocate_rect(rect, Sense::click_and_drag());
+    // Android: a two-finger gesture navigates the canvas, never paints it.
+    // Keep tools suspended until the last finger lifts, preventing the remaining
+    // finger from accidentally drawing after a pinch.
+    #[cfg(target_os = "android")]
+    let touch_navigation = {
+        let key = egui::Id::new(("android-canvas-touch-navigation", idx));
+        let gesture = ctx.input(|i| i.multi_touch());
+        let mut blocked = ctx.data(|d| d.get_temp::<bool>(key)).unwrap_or(false);
+        if let Some(g) = gesture.as_ref().filter(|g| rect.contains(g.center_pos)) {
+            blocked = true;
+            let zoom = crate::zoom_levels::clamp(view.zoom * g.zoom_delta, view.doc_size);
+            if zoom != view.zoom {
+                zoom_about(&mut view, &xf, g.center_pos, zoom, false, ppp);
+            }
+            let delta = xf.unmap_vec(g.translation_delta) / (view.zoom / ppp);
+            view.center[0] -= delta.x;
+            view.center[1] -= delta.y;
+            ctx.request_repaint();
+        }
+        if !ctx.input(|i| i.pointer.any_down()) && gesture.is_none() {
+            blocked = false;
+        }
+        ctx.data_mut(|d| d.insert_temp(key, blocked));
+        blocked
+    };
+    #[cfg(not(target_os = "android"))]
+    let touch_navigation = false;
     let stroke_dismissal = primary && crate::shape_stroke_ui::dismiss_from_canvas(app, &response);
     let painter = ui.painter_at(rect);
 
@@ -3291,7 +3318,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         view.center[1] -= d.y;
         // The tool cursors below are skipped while panning: the fist is set here (#2196).
         ctx.set_cursor_icon(crate::tool_cursor::hand(&ctx, true));
-    } else if primary && !stroke_dismissal && temporary.is_none() && !middle && crate::layer_picker::armed(app).is_some() {
+    } else if primary && !touch_navigation && !stroke_dismissal && temporary.is_none() && !middle && crate::layer_picker::armed(app).is_some() {
         // A Properties Levels/Curves eyedropper (layer_picker.rs) owns the image until Esc or another
         // tool; Space and the middle button still pan. It samples on the press.
         if response.hovered()
@@ -3310,7 +3337,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             let d = xf.to_doc(p);
             crate::layer_picker::sample_at(app, d[0], d[1]);
         }
-    } else if primary && !stroke_dismissal {
+    } else if primary && !touch_navigation && !stroke_dismissal {
         let mods = ui.input(|i| i.modifiers);
         // An ⌥-click the window manager took never arrives; say so (alt_grab.rs).
         crate::alt_grab::watch(app, &ctx, egui::Id::new(("pc-alt-grab", idx)), rect, tool, !under_dialog);

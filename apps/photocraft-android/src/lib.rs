@@ -12,7 +12,8 @@ pub fn android_main(app: android_activity::AndroidApp) {
         "PhotoCraft",
         options,
         Box::new(move |cc| {
-            cc.egui_ctx.set_zoom_factor(1.15);
+            // Compact panels leave more room for the canvas on landscape phones.
+            cc.egui_ctx.set_zoom_factor(1.05);
             let repaint = cc.egui_ctx.clone();
             let mut services = photocraft_ui_egui::Services::default();
             services.import = Some(Box::new(|name, bytes, max_svg_group_depth| {
@@ -79,6 +80,13 @@ pub fn android_main(app: android_activity::AndroidApp) {
             let editor = photocraft_ui_egui::PhotocraftApp::new(
                 photocraft_engine::Session::new(), services,
             );
+            let mut editor = editor;
+            editor.ui.panels.color = false;
+            editor.ui.panels.properties = false;
+            editor.ui.panels.history = false;
+            editor.ui.panels.navigator = false;
+            editor.ui.panels.rail = true;
+            photocraft_ui_egui::panels::request_dock_width(&cc.egui_ctx, 250.0);
             Ok(Box::new(editor))
         }),
     );
