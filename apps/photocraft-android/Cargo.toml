@@ -12,3 +12,4 @@ android-activity = { version = "0.6", features = ["native-activity"] }
 eframe = { workspace = true, features = ["wgpu", "android-native-activity"] }
 photocraft-ui-egui = { workspace = true }
 photocraft-engine = { workspace = true }
+photocraft-io = { workspace = true }

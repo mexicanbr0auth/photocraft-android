@@ -15,6 +15,11 @@ pub fn android_main(app: android_activity::AndroidApp) {
             cc.egui_ctx.set_zoom_factor(1.15);
             let repaint = cc.egui_ctx.clone();
             let mut services = photocraft_ui_egui::Services::default();
+            services.import = Some(Box::new(|name, bytes, max_svg_group_depth| {
+                photocraft_io::import_with_svg_group_depth(name, bytes, max_svg_group_depth)
+                    .map(|result| (result.document, result.warnings))
+                    .map_err(|error| error.to_string())
+            }));
             let inbox: photocraft_ui_egui::Inbox = Default::default();
             services.inbox = Some(inbox.clone());
             let bridge = app_storage.join("dialog-bridge");
