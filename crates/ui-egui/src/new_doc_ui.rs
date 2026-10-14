@@ -499,6 +499,21 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
     let cat = get_s(f, "__category", "Recent");
     let mut create = false;
     // Category tabs.
+    #[cfg(target_os = "android")]
+    let category = |ui: &mut egui::Ui, f: &mut Map<String, Value>| {
+        egui::ComboBox::from_id_salt("android-new-doc-category")
+            .selected_text(tl!(&cat))
+            .show_ui(ui, |ui| {
+                for name in CATEGORIES.iter().map(|c| c.0).chain(["Saved"]) {
+                    if ui.selectable_label(cat == name, tl!(name)).clicked() {
+                        f.insert("__category".into(), json!(name));
+                    }
+                }
+            });
+    };
+    #[cfg(target_os = "android")]
+    category(ui, f);
+    #[cfg(not(target_os = "android"))]
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 18.0;
         for name in CATEGORIES.iter().map(|c| c.0).chain(["Saved"]) {

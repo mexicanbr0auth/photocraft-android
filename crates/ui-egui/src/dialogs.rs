@@ -196,6 +196,9 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 ui.set_min_width(w.min(460.0));
             }
             if d.kind == DialogKind::NewDocument {
+                #[cfg(target_os = "android")]
+                ui.set_min_width((ctx.content_rect().width() - 32.0).min(800.0).max(280.0));
+                #[cfg(not(target_os = "android"))]
                 ui.set_min_width(800.0);
             }
             // The About window: room for the contributor table, the same width on every tab.
@@ -214,6 +217,10 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             } else {
                 440.0
             }));
+            #[cfg(target_os = "android")]
+            if d.kind == DialogKind::NewDocument {
+                ui.set_max_width((ctx.content_rect().width() - 32.0).min(800.0));
+            }
             if web {
                 ui.set_max_width(available.x);
                 ui.set_min_size(available);
@@ -242,6 +249,16 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             crate::field_tab::begin(ui.ctx());
             match d.kind {
                 DialogKind::NewDocument => {
+                    #[cfg(target_os = "android")]
+                    {
+                        let room = (ctx.content_rect().height() - 135.0).max(160.0);
+                        egui::ScrollArea::vertical().id_salt(id.with("android-new-document")).max_height(room).show(ui, |ui| {
+                            if crate::new_doc_ui::body(app, ui, &mut fields) {
+                                outcome = Some(true);
+                            }
+                        });
+                    }
+                    #[cfg(not(target_os = "android"))]
                     if crate::new_doc_ui::body(app, ui, &mut fields) {
                         outcome = Some(true);
                     }
