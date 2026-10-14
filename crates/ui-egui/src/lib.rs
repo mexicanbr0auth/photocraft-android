@@ -1761,6 +1761,31 @@ impl eframe::App for PhotocraftApp {
 
     fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
         let frame_start = gpu_canvas::now_ms();
+        #[cfg(target_os = "android")]
+        {
+            // Android can synthesize mouse presses from touches in the same batch.
+            // If a second finger is present, discard synthetic pointer activity
+            // before egui routes it to a brush or eraser.
+            let key = egui::Id::new("android-active-touch-ids");
+            let mut fingers = ctx.data(|d| d.get_temp::<std::collections::HashSet<egui::TouchId>>(key)).unwrap_or_default();
+            let mut multi = fingers.len() >= 2;
+            for event in &raw_input.events {
+                if let egui::Event::Touch { id, phase, .. } = event {
+                    match phase {
+                        egui::TouchPhase::Start => { fingers.insert(*id); }
+                        egui::TouchPhase::End | egui::TouchPhase::Cancel => { fingers.remove(id); }
+                        _ => {}
+                    }
+                    multi |= fingers.len() >= 2;
+                }
+            }
+            ctx.data_mut(|d| d.insert_temp(key, fingers));
+            if multi {
+                raw_input.events.retain(|event| !matches!(event,
+                    egui::Event::PointerMoved(_) | egui::Event::PointerButton { .. }
+                ));
+            }
+        }
         // An undecorated window gets its caption back when the toolkit changes its flags
         // (maximize, restore, …): take it off again before the frame is laid out (#2246).
         if let Some(window_frame) = self.services.window_frame.as_mut() {
@@ -1855,6 +1880,40 @@ impl eframe::App for PhotocraftApp {
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(backdrop)).show(ui, |ui| {
             canvas::document_area(self, ui);
         });
+        #[cfg(target_os = "android")]
+        {
+            // A persistent, touch-sized navigation strip independent of desktop menus.
+            let screen = ctx.content_rect();
+            egui::Area::new(egui::Id::new("android-navigation-strip"))
+                .order(egui::Order::Foreground)
+                .fixed_pos(egui::pos2(screen.left() + 76.0, screen.bottom() - 104.0))
+                .show(&ctx, |ui| {
+                    egui::Frame::popup(ui.style()).show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            let navigating = self.ui.tool == state::Tool::Hand;
+                            if ui.add_sized([90.0, 38.0], egui::Button::new("Mover").selected(navigating)).clicked() {
+                                self.ui.tool = state::Tool::Hand;
+                            }
+                            if ui.add_sized([90.0, 38.0], egui::Button::new("Pincel").selected(!navigating)).clicked() {
+                                self.ui.tool = state::Tool::Brush;
+                            }
+                            if ui.add_sized([65.0, 38.0], egui::Button::new("Início")).clicked() {
+                                self.ui.chrome.home = Some(self.session.documents().len());
+                            }
+                            if ui.add_sized([65.0, 38.0], egui::Button::new("Voltar")).clicked() {
+                                if let Some(dialog) = self.ui.dialogs.last().map(|d| d.id) {
+                                    let _ = dialogs::cancel(self, dialog);
+                                } else {
+                                    self.ui.chrome.home = None;
+                                    self.ui.panels.dock = true;
+                                    self.ui.panels.toolbar = true;
+                                    self.ui.panels.options_bar = true;
+                                }
+                            }
+                        });
+                    });
+                });
+        }
         panels::properties_window(self, &ctx);
         brush_panel::window(self, &ctx);
         preset_panels::windows(self, &ctx);

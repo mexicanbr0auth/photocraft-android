@@ -81,6 +81,7 @@ pub fn android_main(app: android_activity::AndroidApp) {
                 photocraft_engine::Session::new(), services,
             );
             let mut editor = editor;
+            editor.ui.tool = photocraft_ui_egui::state::Tool::Hand;
             editor.ui.panels.color = false;
             editor.ui.panels.properties = false;
             editor.ui.panels.history = false;
