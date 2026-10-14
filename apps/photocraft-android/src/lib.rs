@@ -17,6 +17,43 @@ pub fn android_main(app: android_activity::AndroidApp) {
             let mut services = photocraft_ui_egui::Services::default();
             let inbox: photocraft_ui_egui::Inbox = Default::default();
             services.inbox = Some(inbox.clone());
+            let bridge = app_storage.join("dialog-bridge");
+            let _ = std::fs::create_dir_all(&bridge);
+            services.file_dialog = Some(Box::new(move |request, _, reply| {
+                use photocraft_ui_egui::{FileDialogRequest, FileDialogAnswer};
+                let request_path = bridge.join("request");
+                let response_path = bridge.join("response");
+                let _ = std::fs::remove_file(&response_path);
+                let kind = match request {
+                    FileDialogRequest::Open { multiple, .. } => if multiple { "open-multiple" } else { "open" },
+                    FileDialogRequest::Save { .. } => "save",
+                    FileDialogRequest::Folder { .. } => "folder",
+                };
+                if let Err(err) = std::fs::write(&request_path, kind) {
+                    reply.send(Some(FileDialogAnswer::Unavailable(err.to_string())));
+                    return;
+                }
+                let bridge = bridge.clone();
+                std::thread::spawn(move || {
+                    for _ in 0..600 {
+                        if let Ok(answer) = std::fs::read_to_string(bridge.join("response")) {
+                            let _ = std::fs::remove_file(bridge.join("response"));
+                            let paths: Vec<String> = answer.lines().map(str::to_owned).filter(|s| !s.is_empty()).collect();
+                            let result = if paths.is_empty() { None } else {
+                                Some(match kind {
+                                    "save" => FileDialogAnswer::SaveTo(paths[0].clone()),
+                                    "folder" => FileDialogAnswer::FolderTo(paths[0].clone()),
+                                    _ => FileDialogAnswer::Paths(paths),
+                                })
+                            };
+                            reply.send(result);
+                            return;
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(150));
+                    }
+                    reply.send(Some(FileDialogAnswer::Unavailable("Android file picker timed out".into())));
+                });
+            }));
             let incoming = app_storage.join("incoming");
             let _ = std::fs::create_dir_all(&incoming);
             std::thread::spawn(move || loop {
